@@ -1,0 +1,85 @@
+
+
+1) qryAppendAllFlowLoansToMPFLoansAggregateSouce-One
+2) qryAppendAllFlowLoansToMPFLoansAggregateSouce-two
+3) qryAppendAllFlowLoansToMPFLoansAggregateSouce-three
+4) qryPalmsDataSource
+5) qryAppendUnhedgedDataTotblSecurityiesPalmsSource 
+
+
+
+
+
+
+
+qryPalmsDataSource:
+
+
+
+tblMPFLoansAggregateSource.EntryDate AS Settle, NextDate([Settle],[ScheduleType]) AS NxtPmt, "0" AS PPConst, "1" AS PPMult, "1" AS PPSense, "0" AS Lag, "0" AS Lock, "12" AS PPFq, 
+   [NxtPmt] AS NxtPP, NextDate([Settle],[ScheduleType]) AS NxtRst1, [Wac] AS PrepWac, [Coup] AS PrepCoup, "Fixed" AS FA, "0" AS Const2, 1 AS Mult1, 0 AS Mult2, "3L" AS Rate, 
+   "12" AS RF, -1000000000 AS Floor, 1000000000 AS Cap, 1 AS PF, 1000000000 AS PF1, 1000000000 AS PF2, 1000000000 AS PC, "Bond" AS AB, [NxtRst1] AS NxtRst2, 0 AS LookBack2, 
+   0 AS LookBackRate, tblMPFLoansAggregateSource.EntryDate AS WamDate, "CPR" AS PPUnits, 0 AS PPCRShift, 0 AS RcvCurrEscr, 0 AS PayCurrEscr, "StraightLine" AS AmortMethod, 
+   "MPFProgram" AS ClientName, tblMPFLoansAggregateSource.PrepaymentInterestRate, tblMPFLoansAggregateSource.CurrentLoanBalance AS AcctBalance, 
+   IIf([ScheduleType]="GL","GNMA",IIf([ScheduleType]="MS","GNMA","FNMA")) AS Agency, 
+   IIf([ScheduleType]="MS",18,IIf([ScheduleType]="GL",18,IIf([ScheduleType]="MA",2,IIf([ScheduleType]="AA",48,IIf([ScheduleType]="SS",18,18))))) AS Delay, 
+   tblMPFLoansAggregateSource.NumberOfMonths AS OWAM, 0 AS Ballon, 1 AS IF, 0 AS Const1, 0 AS [Int Coup Mult], 1 AS [PP Coup Mult], -10000000000 AS [Sum Floor], 
+   10000000000 AS [Sum Cap], "None" AS [Servicing Model], "None" AS [Loss Model], 0 AS [Sched Cap?], tblMPFLoansAggregateSource.CurrentLoanBalance, 
+   tblMPFLoansAggregateSource.OriginalAmount, tblMPFLoansAggregateSource.ChicagoParticipation, tblMPFLoansAggregateSource.LoanRecordCreationDate
+FROM tblMPFLoansAggregateSource, tblPALMSRepo
+WHERE (((tblMPFLoansAggregateSource.LoanNumber)<>198611))
+ORDER BY tblMPFLoansAggregateSource.LoanNumber;
+
+
+
+
+qryAppendUnhedgedDataTotblSecurityiesPalmsSource:
+
+
+
+INSERT INTO tblSecuritiesPalmsSource ( AccountClass, AccountType, ScheduleType, PassThruRate, Portfolio, CUSIP, H2, AggNotional, Mult, AggFactor, [Add Accrued?], PV, Swap, AggWac, AggCoup, AggWam, AggAge, H1, Swam, AggOWAM, [P/O], AggPrice, OAS, Settle, Repo, NxtPmt, PP, PPConst, PPMult, PPSense, Lag, Lock, PPFq, NxtPP, NxtRst1, AggPrepWac, AggPrepCoup, FA, Const1, Const2, Rate, RF, Floor, Cap, PF, PF1, PF2, PC, AB, NxtRst2, LookBackRate, LookBack, WamDate, PPUnits, PPCRShift, RcvCurrEscr, PayCurrEscr, AggBookPrice, AmortMethod, ClientName, [Active?], Agency, [Int Coup Mult], [PP Coup Mult], [Sum Floor], [Sum Cap], [Servicing Model], [Loss Model], [Sched Cap?], Delay, Ballon, IF, Mult1, Mult2, PrepaymentInterestRate )
+SELECT qryUnhedgedPalmsDataSource.AccountClass, qryUnhedgedPalmsDataSource.AccountType, qryUnhedgedPalmsDataSource.ScheduleType, qryUnhedgedPalmsDataSource.PassThruRate, Last(qryUnhedgedPalmsDataSource.Portfolio) AS Portfolio, Last(qryUnhedgedPalmsDataSource.CUSIP) AS CUSIP, Count(qryUnhedgedPalmsDataSource.LoanNumber) AS H2, Sum(qryUnhedgedPalmsDataSource.Notional) AS AggNotional, Last(qryUnhedgedPalmsDataSource.Mult) AS Mult, IIf(Sum([CurrentLoanBalance])=0,Sum([OriginalAmount])/Sum([OriginalAmount]),Sum([CurrentLoanBalance])/Sum([OriginalAmount])) AS AggFactor, Last(qryUnhedgedPalmsDataSource.[Add Accrued?]) AS [Add Accrued?], Last(qryUnhedgedPalmsDataSource.PV) AS PV, Last(qryUnhedgedPalmsDataSource.Swap) AS Swap, (Sum([Wac]*[AcctBalance]*[ChicagoParticipation])/Sum([AcctBalance]*[ChicagoParticipation])) AS AggWac, (Sum([Coup]*[AcctBalance]*[ChicagoParticipation])/Sum([AcctBalance]*[ChicagoParticipation])) AS AggCoup, CInt(Sum([Wam]*[AcctBalance]*[ChicagoParticipation])/Sum([AcctBalance]*[ChicagoParticipation])) AS AggWam, (Sum([Age]*[AcctBalance]*[ChicagoParticipation])/Sum([AcctBalance]*[ChicagoParticipation])) AS AggAge, IIf(Val([AccountType])=30 And [AggWam]<340,"Seasoned",IIf(Val([AccountType])=20 And [AggWam]<220,"Seasoned",IIf(Val([AccountType])=15 And [AggWam]<160,"Seasoned","MPF"))) AS H1, Last(qryUnhedgedPalmsDataSource.Swam) AS Swam, CInt(Sum([OWAM]*[AcctBalance]*[ChicagoParticipation])/Sum([AcctBalance]*[ChicagoParticipation])) AS AggOWAM, IIf([H1]="Seasoned","OAS","Price") AS [P/O], 0 AS AggPrice, 0 AS OAS, Last(qryUnhedgedPalmsDataSource.Settle) AS Settle, Last(qryUnhedgedPalmsDataSource.Repo) AS Repo, Last(qryUnhedgedPalmsDataSource.NxtPmt) AS NxtPmt, "AFT" AS PP, Last(qryUnhedgedPalmsDataSource.PPConst) AS PPConst, Last(qryUnhedgedPalmsDataSource.PPMult) AS PPMult, Last(qryUnhedgedPalmsDataSource.PPSense) AS PPSense, Last(qryUnhedgedPalmsDataSource.Lag) AS Lag, Last(qryUnhedgedPalmsDataSource.Lock) AS Lock, Last(qryUnhedgedPalmsDataSource.PPFq) AS PPFq, Last(qryUnhedgedPalmsDataSource.NxtPP) AS NxtPP, Last(qryUnhedgedPalmsDataSource.NxtRst1) AS NxtRst1, (Sum([PrepWac]*[AcctBalance]*[ChicagoParticipation])/Sum([AcctBalance]*[ChicagoParticipation])) AS AggPrepWac, (Sum([PrepCoup]*[AcctBalance]*[ChicagoParticipation])/Sum([AcctBalance]*[ChicagoParticipation])) AS AggPrepCoup, Last(qryUnhedgedPalmsDataSource.FA) AS FA, Last(qryUnhedgedPalmsDataSource.Const1) AS Const1, Last(qryUnhedgedPalmsDataSource.Const2) AS Const2, Last(qryUnhedgedPalmsDataSource.Rate) AS Rate, Last(qryUnhedgedPalmsDataSource.RF) AS RF, Last(qryUnhedgedPalmsDataSource.Floor) AS Floor, Last(qryUnhedgedPalmsDataSource.Cap) AS Cap, Last(qryUnhedgedPalmsDataSource.PF) AS PF, Last(qryUnhedgedPalmsDataSource.PF1) AS PF1, Last(qryUnhedgedPalmsDataSource.PF2) AS PF2, Last(qryUnhedgedPalmsDataSource.PC) AS PC, Last(qryUnhedgedPalmsDataSource.AB) AS AB, Last(qryUnhedgedPalmsDataSource.NxtRst2) AS NxtRst2, Last(qryUnhedgedPalmsDataSource.LookBackRate) AS LookBackRate1, Last(qryUnhedgedPalmsDataSource.LookBack2) AS LookBack2, Last(CStr([qryUnhedgedPalmsDataSource].[WamDate])) AS WamDate, Last(qryUnhedgedPalmsDataSource.PPUnits) AS PPUnits, Avg(qryUnhedgedPalmsDataSource.PPCRShift) AS PPCRShift, Last(qryUnhedgedPalmsDataSource.RcvCurrEscr) AS RcvCurrEscr, Last(qryUnhedgedPalmsDataSource.PayCurrEscr) AS PayCurrEscr, Sum([CurrentLoanBalance]*[ChicagoParticipation]) AS AggBookPrice, Last(qryUnhedgedPalmsDataSource.AmortMethod) AS AmortMethod, Last(qryUnhedgedPalmsDataSource.ClientName) AS ClientName, Last(qryUnhedgedPalmsDataSource.[Active?]) AS [Active?], Last(qryUnhedgedPalmsDataSource.Agency) AS Agency, Last(qryUnhedgedPalmsDataSource.[Int Coup Mult]) AS [Int Coup Mult], Last(qryUnhedgedPalmsDataSource.[PP Coup Mult]) AS [PP Coup Mult], Last(qryUnhedgedPalmsDataSource.[Sum Floor]) AS [Sum Floor], Last(qryUnhedgedPalmsDataSource.[Sum Cap]) AS [Sum Cap], Last(qryUnhedgedPalmsDataSource.[Servicing Model]) AS [Servicing Model], Last(qryUnhedgedPalmsDataSource.[Loss Model]) AS [Loss Model], Last(qryUnhedgedPalmsDataSource.[Sched Cap?]) AS [Sched Cap?], Last(qryUnhedgedPalmsDataSource.Delay) AS Delay, Last(qryUnhedgedPalmsDataSource.Ballon) AS Ballon, Last(qryUnhedgedPalmsDataSource.IF) AS IF, Last(qryUnhedgedPalmsDataSource.Mult1) AS Mult1, Last(qryUnhedgedPalmsDataSource.Mult2) AS Mult2, (Sum([PrepaymentInterestRate]*[AcctBalance]*[ChicagoParticipation])/Sum([AcctBalance]*[ChicagoParticipation])) AS AggPrepaymentInterestRate
+FROM qryUnhedgedPalmsDataSource
+GROUP BY qryUnhedgedPalmsDataSource.AccountClass, qryUnhedgedPalmsDataSource.AccountType, qryUnhedgedPalmsDataSource.ScheduleType, qryUnhedgedPalmsDataSource.PassThruRate, qryUnhedgedPalmsDataSource.OriginationYear
+HAVING ((((Sum([Age]*[AcctBalance]*[ChicagoParticipation])/Sum([AcctBalance]*[ChicagoParticipation])))>30))
+ORDER BY qryUnhedgedPalmsDataSource.OriginationYear, qryUnhedgedPalmsDataSource.AccountType DESC , qryUnhedgedPalmsDataSource.ScheduleType DESC , (Sum([PrepaymentInterestRate]*[AcctBalance])/Sum([AcctBalance]));
+
+
+
+
+
+qryAppendAllFlowLoansToMPFLoansAggregateSouce-One:
+
+
+INSERT INTO tblTempMPFFlow ( City, State, PFINumber, MANumber, DeliveryCommitmentNumber, LoanNumber, LoanRecordCreationDate, LastFundingEntryDate, ClosingDate, MPFBalance, Amount, TransactionCode, InterestRate, ProductCode, ScheduleCode, NewCoupon, CouponOld, PrepaymentInterestRate, FirstPaymentDate, MaturityDate, PIAmount, NumberOfMonths, NonBusDayTrnEffDate, RemittanceTypeID, ExcessServicingFee, ServicingFee )
+SELECT tblPFI.City, tblPFI.State, tblLoanFunding.PFINumber, tblLoanFunding.MANumber, tblLoanFunding.DeliveryCommitmentNumber, tblLoanFunding.LoanNumber, [tblLoan]![EntryDate] AS LoanRecordCreationDate, [tblLoanFunding]![EntryDate] AS LastFundingEntryDate, [tblLoanFunding]![FundingDate] AS ClosingDate, [tblLoanFundingSumView]![Amount] AS MPFBalance, tblLoanFunding.Amount, tblLoanFunding.TransactionCode, tblLoanFunding.InterestRate, tblSchedule.ProductCode, tblDeliveryCommitment.ScheduleCode, IIf(Left([tblSchedule].[ProductCode],2)="GL",CDbl([tblLoanFunding]![InterestRate])-0.0046,IIf([tblSchedule].[ProductCode]="FX15",CDbl([tblLoanFunding]![InterestRate])-0.0035,CDbl([tblLoanFunding]![InterestRate])-0.0039)) AS NewCoupon, IIf(Left([tblSchedule].[ProductCode],2)="GL",CDbl([tblLoanFunding]![InterestRate])-([tblDeliveryCommitment]![ServicingFee]+[tblDeliveryCommitment]![ExcessServicingFee]),CDbl([tblLoanFunding]![InterestRate])-0.0039) AS CouponOld, CInt([tblLoanFunding]![InterestRate]*800)/800 AS PrepaymentInterestRate, tblLoanFunding.FirstPaymentDate, tblLoanFunding.MaturityDate, tblLoanFunding.PIAmount, tblLoanFunding.NumberOfMonths, tblLoanFunding.NonBusDayTrnEffDate, tblSchedule.RemittanceTypeID, tblDeliveryCommitment.ExcessServicingFee, tblDeliveryCommitment.ServicingFee
+FROM (((((tblLoan INNER JOIN (tblLoanFunding INNER JOIN tblDeliveryCommitment ON tblLoanFunding.DeliveryCommitmentNumber = tblDeliveryCommitment.DeliveryCommitmentNumber) ON tblLoan.LoanNumber = tblLoanFunding.LoanNumber) INNER JOIN tblSchedule ON tblDeliveryCommitment.ScheduleCode = tblSchedule.ScheduleCode) INNER JOIN tblPFI ON tblLoanFunding.PFINumber = tblPFI.PFINumber) INNER JOIN tblLoanFundingSumView ON tblLoanFunding.LoanNumber = tblLoanFundingSumView.LoanNumber) INNER JOIN tblLoanFundingDateViewTABLE ON (tblLoanFunding.LoanFundingNumber = tblLoanFundingDateViewTABLE.LoanFundingNumber) AND (tblLoanFunding.LoanNumber = tblLoanFundingDateViewTABLE.LoanNumber)) INNER JOIN tblPFILoan AS tblPFILoan_1 ON (tblLoan.PFILoanNumber = tblPFILoan_1.PFILoanNumber) AND (tblLoan.PFINumber = tblPFILoan_1.PFINumber)
+WHERE (((tblPFILoan_1.BatchID) Is Null));
+
+
+
+qryAppendAllFlowLoansToMPFLoansAggregateSouce-Two
+
+SELECT tblTempMPFFlow.City, tblTempMPFFlow.State, tblTempMPFFlow.PFINumber, tblTempMPFFlow.MANumber, tblTempMPFFlow.DeliveryCommitmentNumber, tblTempMPFFlow.LoanNumber, tblTempMPFFlow.LoanRecordCreationDate, tblTempMPFFlow.LastFundingEntryDate, tblTempMPFFlow.ClosingDate, tblTempMPFFlow.MPFBalance, tblTempMPFFlow.Amount, tblTempMPFFlow.TransactionCode, tblTempMPFFlow.InterestRate, tblTempMPFFlow.ProductCode, tblTempMPFFlow.NewCoupon AS NewCoupon2, tblTempMPFFlow.CouponOld, tblTempMPFFlow.PrepaymentInterestRate, tblTempMPFFlow.FirstPaymentDate, tblTempMPFFlow.MaturityDate, tblTempMPFFlow.PIAmount, tblTempMPFFlow.NumberOfMonths, tblTempMPFFlow.ScheduleCode, tblTempMPFFlow.NonBusDayTrnEffDate, tblTempMPFFlow.RemittanceTypeID, tblMonthEndDate.MonthEndDate, [CEFee]+[CEPerformance] AS MACEFee, tblTempMPFFlow.ExcessServicingFee, tblTempMPFFlow.ServicingFee, tblTempMA.CEPerformance AS CEPerformanceFee
+FROM tblMonthEndDate, tblTempMA INNER JOIN tblTempMPFFlow ON tblTempMA.MANumber = tblTempMPFFlow.MANumber
+WHERE (((tblTempMPFFlow.MPFBalance)>0) AND ((tblTempMPFFlow.NonBusDayTrnEffDate)<=[tblMonthEndDate]![MonthEndDate]));
+
+
+
+
+
+qryAppendAllFlowLoansToMPFLoansAggregateSouce-three
+
+INSERT INTO tblMPFLoansAggregateSource ( LoanNumber, DeliveryCommitmentNumber, MANumber, PFINumber, LoanRecordCreationDate, LastFundingEntryDate, OriginalLoanClosingDate, MPFBalance, OriginalAmount, TransactionCode, InterestRate, Coupon, CouponOld, PrepaymentInterestRate, FirstPaymentDate, MaturityDate, PIAmount, NumberOfMonths, ScheduleCode, ProductCode, PortfolioIndicator, RemittanceTypeID, Age, ChicagoParticipation, CurrentLoanBalance, EntryDate, CEFee, ExcessServicingFee, ServicingFee, CEPerformanceFee )
+SELECT [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].LoanNumber, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].DeliveryCommitmentNumber, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].MANumber, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].PFINumber, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].LoanRecordCreationDate, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].LastFundingEntryDate, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].ClosingDate AS OriginalLoanClosingDate, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].MPFBalance, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].Amount AS Expr2, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].TransactionCode, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].InterestRate, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].NewCoupon2, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].CouponOld, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].PrepaymentInterestRate, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].FirstPaymentDate, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].MaturityDate, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].PIAmount, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].NumberOfMonths, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].ScheduleCode, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].ProductCode, "FLOW" AS PortfolioIndicator, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].RemittanceTypeID, ([NumberOfMonths]-IIf(DateDiff("m",[qryAppendAllFlowLoanstoMPFLoansAggregateSource-Two]![MonthEndDate],[MaturityDate],0,0)>[NumberOfMonths],[NumberOfMonths],DateDiff("m",[qryAppendAllFlowLoansToMPFLoansAggregateSource-Two]![MonthEndDate],[MaturityDate],0,0))) AS Age, qryChicagoParticipation.ChicagoParticipation, IIf([Sched End Prin Bal] Is Not Null,[Sched End Prin Bal],[MPFBalance]) AS CurrentLoanBalance, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].MonthEndDate, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].MACEFee, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].ExcessServicingFee, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].ServicingFee, [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].CEPerformanceFee
+FROM (tblTempMA INNER JOIN (qryChicagoParticipation INNER JOIN [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two] ON qryChicagoParticipation.DeliveryCommitmentNumber = [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].DeliveryCommitmentNumber) ON tblTempMA.MANumber = [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].MANumber) LEFT JOIN tblNorwestLoansForFives ON [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].LoanNumber = tblNorwestLoansForFives.LoanNumber
+WHERE (((IIf([Sched End Prin Bal] Is Not Null,[Sched End Prin Bal],[MPFBalance]))<>0) AND ((tblTempMA.ProgramCode)<>"FHA"))
+ORDER BY [qryAppendAllFlowLoansToMPFLoansAggregateSource-Two].LoanNumber;
+
+
+qryUnhedgedPalmsDataSource
+SELECT qryPalmsDataSource.*, [MPF Hedges].DeliveryCommitmentNumber AS DeliveryCommitmentNumber, [MPF Hedges].HedgeID
+FROM qryPalmsDataSource LEFT JOIN [MPF Hedges] ON qryPalmsDataSource.LoanNumber = [MPF Hedges].LoanNumber
+WHERE ((([MPF Hedges].HedgeID) Is Null));
+
+
